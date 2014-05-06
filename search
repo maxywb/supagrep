@@ -1,0 +1,147 @@
+#!/usr/bin/env python
+import sys, os, fnmatch
+import subprocess as sp
+from getpass import getuser
+
+def locate(pattern, root=os.curdir):
+    '''Locate all files matching supplied filename pattern in and below
+    supplied root directory.'''
+    for path, dirs, files in os.walk(os.path.abspath(root)):
+        for filename in fnmatch.filter(files, pattern):
+            yield os.path.join(path, filename)
+
+def add(collection, fileName, findWord):
+    if not findWord in collection.keys():
+        collection[findWord] = set()
+    collection[findWord].add(fileName)
+
+USAGE="""
+search SEARCH_TERM [ANOTHER_TERM -EXLUDE_TERM --emacs --path=PATH_TO_SEARCH 
+                    --include=REGEX --all --list(l) --recurse(r) --ignorecase(i)]
+"""
+
+## state variables
+
+inclusive = False
+EMACS = False
+searchlist = "/home/%s/.search.list"%getuser()
+path = "."
+include = ""
+exclude = ""
+base = " | grep -%s %s"    
+command = ""
+filetype = ""
+cmdstr = " ".join(sys.argv)
+numArgs = len(sys.argv)
+no_recurse = True
+ignore = False
+grepFlags = "G" # grep flags that apply to only the subsequent greps
+keyGrepFlags = "G" # grep flags that apply to only the initial grep
+listFiles = False
+plus = list()  # terms to look for
+minus = list() # terms to prune
+
+## argument parsing
+
+first = True
+for arg in sys.argv:
+    if first:
+        first = False
+        continue
+    if arg.startswith("--"):
+        switch = arg.split("--")[-1]
+        if switch.startswith("path="):
+            if path is not ".":
+                print "error: only define a single path"
+                sys.exit()
+            path = arg.split("=")[-1]
+        elif switch.startswith("f="):
+            filetype = "--include=%s"%arg.split("=")[-1]
+        elif switch == "emacs":
+            EMACS = True;
+        elif switch == "list":
+            keyGrepFlags = keyGrepFlags+"l"            
+        elif switch == "all":
+            inclusive = True;
+        elif switch == "recurse":
+            no_recurse = False
+            keyGrepFlags = keyGrepFlags+"r"
+        elif switch == "ignore":
+            ignore = True
+            grepFlags = grepFlags+"i"
+            keyGrepFlags = keyGrepFlags+"i"
+        else:
+            for char in switch:
+                if char == "i":
+                    grepFlags = grepFlags + "i"
+                    keyGrepFlags = keyGrepFlags+"i"
+                elif char == "n":
+                    keyGrepFlags = keyGrepFlags+"n"
+                elif char == "r":
+                    keyGrepFlags = keyGrepFlags+"r"
+                elif char == "l":
+                    keyGrepFlags = keyGrepFlags+"l"
+                else:
+                    print "ignoring offending switch: " + char
+    elif arg.startswith("-"):
+        minus.append(arg.split("-")[-1])
+    else:
+        plus.append(arg.split("+")[-1])
+
+if no_recurse:
+    path = path + "/*"
+    
+os.system("echo %s > %s"%(cmdstr,searchlist))
+
+numPlus = len(plus)
+files = list()
+    
+if len(plus) < 1:
+    print USAGE
+    sys.exit()
+
+command = "grep %s -%s %s %s  2> /dev/null"%(filetype,keyGrepFlags,plus[0],path)
+
+if(inclusive):
+## searching
+    collection = dict()
+    for fileName in locate("*pp"):
+        text = open(fileName,"r").read()
+        for findWord in plus:
+            if findWord in text:
+                add(collection,fileName,findWord)
+    workingSet = collection[plus[0]]
+    for otherSet in collection.values():
+        workingSet = workingSet & otherSet 
+
+    length = len(os.path.abspath(os.curdir))
+    
+    for f in workingSet:
+        print "."+f[length:]
+
+    quit()
+else:
+    skipfirst = True
+    for findWord in plus:
+        if skipfirst:
+            skipfirst = False
+            continue
+        include = include + base%(grepFlags," %s"%findWord)
+        command = command + include
+                                 
+for ex in minus:
+    exclude = exclude + base%(grepFlags,"-v %s"%ex)
+command = command + exclude
+command = command + " | grep -v \~ "
+
+
+if EMACS:
+    os.system(command)
+    command = "emacs `"+command+"` &"
+else:
+    print "sh:",command
+os.system(command)
+    
+
+
+
