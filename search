@@ -28,20 +28,24 @@ searchlist = "/home/%s/.search.list"%getuser()
 path = "."
 include = ""
 exclude = ""
-base = " | grep -%s %s"    
+base = " | grep %s %s"    
 command = ""
 filetype = ""
 cmdstr = " ".join(sys.argv)
 numArgs = len(sys.argv)
 no_recurse = True
 ignore = False
-grepFlags = "G" # grep flags that apply to only the subsequent greps
-keyGrepFlags = "G" # grep flags that apply to only the initial grep
+grepFlags = "--color=auto -G" # grep flags that apply to only the subsequent greps
+keyGrepFlags = "S" # grep flags that apply to only the initial grep
 listFiles = False
 plus = list()  # terms to look for
 minus = list() # terms to prune
 
 ## argument parsing
+
+
+### todo:
+### --context
 
 first = True
 for arg in sys.argv:
@@ -70,6 +74,8 @@ for arg in sys.argv:
             ignore = True
             grepFlags = grepFlags+"i"
             keyGrepFlags = keyGrepFlags+"i"
+        elif switch == "context":
+            keyGrepFlags = keyGrepFlags+"C2 -S"
         else:
             for char in switch:
                 if char == "i":
@@ -81,6 +87,8 @@ for arg in sys.argv:
                     keyGrepFlags = keyGrepFlags+"r"
                 elif char == "l":
                     keyGrepFlags = keyGrepFlags+"l"
+                elif char == "c":
+                    keyGrepFlags = keyGrepFlags+"C2 -S"
                 else:
                     print "ignoring offending switch: " + char
     elif arg.startswith("-"):
@@ -100,7 +108,7 @@ if len(plus) < 1:
     print USAGE
     sys.exit()
 
-command = "grep %s -%s %s %s  2> /dev/null"%(filetype,keyGrepFlags,plus[0],path)
+command = "ag %s %s -%s 2> /dev/null"%(plus[0],path,keyGrepFlags)
 
 if(inclusive):
 ## searching
@@ -132,7 +140,7 @@ else:
 for ex in minus:
     exclude = exclude + base%(grepFlags,"-v %s"%ex)
 command = command + exclude
-command = command + " | grep -v \~ "
+
 
 
 if EMACS:
