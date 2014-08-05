@@ -16,14 +16,13 @@ def add(collection, fileName, findWord):
     collection[findWord].add(fileName)
 
 USAGE="""
-search SEARCH_TERM [ANOTHER_TERM -EXLUDE_TERM --emacs --path=PATH_TO_SEARCH 
+search SEARCH_TERM [ANOTHER_TERM -EXLUDE_TERM --path=PATH_TO_SEARCH 
                     --include=REGEX --all --list(l) --recurse(r) --ignorecase(i)]
 """
 
 ## state variables
 
 inclusive = False
-EMACS = False
 searchlist = "/home/%s/.search.list"%getuser()
 path = "."
 include = ""
@@ -61,8 +60,6 @@ for arg in sys.argv:
             path = arg.split("=")[-1]
         elif switch.startswith("f="):
             filetype = "--include=%s"%arg.split("=")[-1]
-        elif switch == "emacs":
-            EMACS = True;
         elif switch == "list":
             keyGrepFlags = keyGrepFlags+"l"            
         elif switch == "all":
@@ -142,14 +139,10 @@ for ex in minus:
 command = command + exclude
 
 
-
-if EMACS:
-    os.system(command)
-    command = "emacs `"+command+"` &"
-else:
-    print "sh:",command
 os.system(command)
-    
+if not listFiles:
+    # don't print command when listing for better use with other shell commands
+    print command
 
 
 
